@@ -3,8 +3,10 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+FirebaseAuth auth = FirebaseAuth.instance;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,65 +14,36 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => Counter()),
+        ChangeNotifierProvider(create: (_) => UserName()),
       ],
       child: const MyApp(),
     ),
   );
 }
 
-class Counter with ChangeNotifier, DiagnosticableTreeMixin {
-  int _count = 0;
+class UserName with ChangeNotifier, DiagnosticableTreeMixin {
+  String _username = "";
+  String _password = "";
 
-  int get count => _count;
+  String get username => _username;
+  String get password => _password;
+  // ignore: non_constant_identifier_names
+  void SetUserName(value) {
+    _username = value;
+    notifyListeners();
+  }
 
-  void increment(value) {
-    _count = value;
+  void SetPassword(value) {
+    _password = value;
     notifyListeners();
   }
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(IntProperty('count', count));
+    properties.add(StringProperty('username', username));
+    properties.add(StringProperty('password', password));
   }
-}
-
-Future<Position> _determinePosition() async {
-  bool serviceEnabled;
-  LocationPermission permission;
-
-  // Test if location services are enabled.
-  serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  if (!serviceEnabled) {
-    // Location services are not enabled don't continue
-    // accessing the position and request users of the
-    // App to enable the location services.
-    return Future.error('Location services are disabled.');
-  }
-
-  permission = await Geolocator.checkPermission();
-  if (permission == LocationPermission.denied) {
-    permission = await Geolocator.requestPermission();
-    if (permission == LocationPermission.denied) {
-      // Permissions are denied, next time you could try
-      // requesting permissions again (this is also where
-      // Android's shouldShowRequestPermissionRationale
-      // returned true. According to Android guidelines
-      // your App should show an explanatory UI now.
-      return Future.error('Location permissions are denied');
-    }
-  }
-
-  if (permission == LocationPermission.deniedForever) {
-    // Permissions are denied forever, handle appropriately.
-    return Future.error(
-        'Location permissions are permanently denied, we cannot request permissions.');
-  }
-
-  // When we reach here, permissions are granted and we can
-  // continue accessing the position of the device.
-  return await Geolocator.getCurrentPosition();
 }
 
 class MyApp extends StatelessWidget {
@@ -86,6 +59,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (context) => const MyHomePage(),
         '/second': (context) => const SecondRoute(),
+        '/third': (context) => const ThirdRoute(),
       },
     );
   }
@@ -99,18 +73,25 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String _myPos = 'waiting';
   @override
   void initState() {
     super.initState();
-    getData();
   }
 
-  void getData() async {
-    Position pos = await _determinePosition();
-    setState(() {
-      _myPos = 'lat: ${pos.latitude}, long: ${pos.longitude}';
-    });
+  void signIn(email, password) async {
+    try {
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') {
+        print('No user found for that email.');
+      } else if (e.code == 'wrong-password') {
+        print('Wrong password provided for that user.');
+      }
+    } finally {
+      print("This is FINALLY Clause and is always executed.");
+      Navigator.pushNamed(context, '/third');
+    }
   }
 
   @override
@@ -124,25 +105,41 @@ class _MyHomePageState extends State<MyHomePage> {
         mainAxisAlignment: MainAxisAlignment.center,
         // ignore: prefer_const_literals_to_create_immutables
         children: <Widget>[
-          Avatar(),
-          Text(
-            'Thomas Vigier: ',
-            style: TextStyle(fontFamily: 'Praise', fontSize: 40),
+          Align(
+            alignment: Alignment.topCenter,
+            child: Text(
+              'Log In ',
+              style: TextStyle(fontFamily: 'Praise', fontSize: 50),
+            ),
           ),
-          Text(
-            'Mobile Dev',
-            style: TextStyle(fontFamily: 'Praise', fontSize: 20),
+          Align(
+            alignment: Alignment.topCenter,
+            child: Text(
+              'Please enter your username and password ',
+              style: TextStyle(fontFamily: 'Praise', fontSize: 20),
+            ),
           ),
-          Text(
-            'Tasks: ${context.watch<Counter>().count}',
-            style: TextStyle(fontFamily: 'Praise', fontSize: 20),
+          TextField(
+            decoration: const InputDecoration(
+                border: OutlineInputBorder(), hintText: 'Username'),
+            onChanged: (text) {
+              context.read<UserName>().SetUserName(text);
+            },
           ),
-          Container(
-              width: 100.0,
-              height: 100.0,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-              )),
+          TextField(
+            decoration: const InputDecoration(
+                border: OutlineInputBorder(), hintText: 'Password'),
+            onChanged: (text) {
+              context.read<UserName>().SetPassword(text);
+            },
+          ),
+          ElevatedButton(
+              onPressed: () {
+                final username = context.read<UserName>().username;
+                final password = context.read<UserName>().password;
+                signIn(username, password);
+              },
+              child: const Text('Log In')),
           TextButton(
             style: TextButton.styleFrom(
               padding: const EdgeInsets.all(16.0),
@@ -151,36 +148,11 @@ class _MyHomePageState extends State<MyHomePage> {
             onPressed: () {
               Navigator.pushNamed(context, '/second');
             },
-            child: Text(
-              _myPos,
-            ),
+            child: Text("Don't have an account ? Register"),
           ),
         ],
       )),
     );
-  }
-}
-
-class Avatar extends StatefulWidget {
-  const Avatar({
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  State<Avatar> createState() => _AvatarState();
-}
-
-class _AvatarState extends State<Avatar> {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-        width: 100.0,
-        height: 100.0,
-        decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            image: DecorationImage(
-                fit: BoxFit.fill,
-                image: AssetImage('assets/img/Mallard2.jpg'))));
   }
 }
 
@@ -198,121 +170,122 @@ class _SecondRouteState extends State<SecondRoute> {
   List<bool> ckeckedList = <bool>[];
   bool isChecked = false;
 
+  void register(email, password) async {
+    try {
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'weak-password') {
+        print('The password provided is too weak.');
+      } else if (e.code == 'email-already-in-use') {
+        print('The account already exists for that email.');
+      }
+    } catch (e) {
+      print(e);
+    } finally {
+      print("This is FINALLY Clause and is always executed.");
+      Navigator.pushNamed(context, '/third');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Column(children: <Widget>[
-          TopPart(taskNbr: taskNbr),
-          ListView.builder(
-              shrinkWrap: true,
-              scrollDirection: Axis.vertical,
-              itemCount: entries.length,
-              itemBuilder: (BuildContext context, int index) {
-                return Row(
-                  children: <Widget>[
-                    Center(
-                        child: Text(entries[index],
-                            style:
-                                TextStyle(fontFamily: 'Praise', fontSize: 30))),
-                    Checkbox(
-                      checkColor: Colors.white,
-                      value: ckeckedList[index],
-                      onChanged: (bool? value) {
-                        setState(() {
-                          ckeckedList[index] = value!;
-                        });
-                      },
-                    ),
-                  ],
-                );
-              }),
-        ]),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          showModalBottomSheet<void>(
-            context: context,
-            builder: (BuildContext context) {
-              return Container(
-                height: 200,
-                color: Colors.amber,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      const Text('Add Task'),
-                      TextField(
-                        decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            hintText: 'Enter a task'),
-                        onChanged: (text) {
-                          test = text;
-                        },
-                      ),
-                      ElevatedButton(
-                        child: const Text('Add'),
-                        onPressed: () {
-                          setState(() {
-                            entries.add(test);
-                            ckeckedList.add(false);
-                            taskNbr = entries.length;
-                          });
-                          context.read<Counter>().increment(taskNbr);
-                          Navigator.pop(context);
-                        },
-                      )
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-        label: const Text('Approve'),
-        icon: const Icon(Icons.plus_one),
-        backgroundColor: Colors.pink,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Align(
+              alignment: Alignment.topCenter,
+              child: Text(
+                'Register',
+                style: TextStyle(fontFamily: 'Praise', fontSize: 50),
+              ),
+            ),
+            Align(
+              alignment: Alignment.topCenter,
+              child: Text(
+                'Please enter your username and password ',
+                style: TextStyle(fontFamily: 'Praise', fontSize: 20),
+              ),
+            ),
+            TextField(
+              decoration: const InputDecoration(
+                  border: OutlineInputBorder(), hintText: 'Username'),
+              onChanged: (text) {
+                context.read<UserName>().SetUserName(text);
+              },
+            ),
+            TextField(
+              decoration: const InputDecoration(
+                  border: OutlineInputBorder(), hintText: 'Password'),
+              onChanged: (text) {
+                context.read<UserName>().SetPassword(text);
+              },
+            ),
+            ElevatedButton(
+                onPressed: () {
+                  final username = context.read<UserName>().username;
+                  final password = context.read<UserName>().password;
+                  register(username, password);
+                },
+                child: const Text('Register')),
+            TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.all(16.0),
+                textStyle: const TextStyle(fontFamily: 'Praise', fontSize: 20),
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text("Already have an account ? Log In"),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class TopPart extends StatelessWidget {
-  const TopPart({
-    Key? key,
-    required this.taskNbr,
-  }) : super(key: key);
+class ThirdRoute extends StatefulWidget {
+  const ThirdRoute({Key? key}) : super(key: key);
 
-  final int taskNbr;
+  @override
+  State<ThirdRoute> createState() => _ThirdRouteState();
+}
+
+class _ThirdRouteState extends State<ThirdRoute> {
+  var taskNbr = 0;
+  List<String> entries = <String>[];
+  String test = 'base';
+  List<bool> ckeckedList = <bool>[];
+  bool isChecked = false;
+
+  void register(email, password) async {
+    try {
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'weak-password') {
+        print('The password provided is too weak.');
+      } else if (e.code == 'email-already-in-use') {
+        print('The account already exists for that email.');
+      }
+    } catch (e) {
+      print(e);
+    } finally {
+      print("This is FINALLY Clause and is always executed.");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 200.0,
-      width: 360,
-      color: Colors.purple,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          IconButton(
-            padding: EdgeInsets.only(top: 40.0),
-            icon: const Icon(Icons.arrow_back),
-            tooltip: 'Increase volume by 10',
-            onPressed: () {
-              Navigator.pop(context);
-            },
-          ),
-          Text(
-            'TO DO LIST',
-            style: TextStyle(
-                fontFamily: 'Praise', fontSize: 40, color: Colors.black),
-          ),
-          Text(
-            '$taskNbr tasks',
-            style: TextStyle(
-                fontFamily: 'Praise', fontSize: 20, color: Colors.black),
-          ),
-        ],
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[],
+        ),
       ),
     );
   }
