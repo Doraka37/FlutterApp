@@ -6,8 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:camera/camera.dart';
+import 'components/camera_page.dart';
+import 'components/register_page.dart';
 
-List<CameraDescription> cameras = [];
 FirebaseAuth auth = FirebaseAuth.instance;
 
 void main() async {
@@ -68,22 +69,22 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(primarySwatch: Colors.pink),
       initialRoute: '/',
       routes: {
-        '/': (context) => const MyHomePage(),
-        '/second': (context) => const SecondRoute(),
-        '/third': (context) => const ThirdRoute(),
+        '/': (context) => const LoginPage(),
+        '/register': (context) => const RegisterPage(),
+        '/third': (context) => const CameraPage(),
       },
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key}) : super(key: key);
+class LoginPage extends StatefulWidget {
+  const LoginPage({Key? key}) : super(key: key);
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
@@ -157,178 +158,12 @@ class _MyHomePageState extends State<MyHomePage> {
               textStyle: const TextStyle(fontFamily: 'Praise', fontSize: 20),
             ),
             onPressed: () {
-              Navigator.pushNamed(context, '/second');
+              Navigator.pushNamed(context, '/register');
             },
             child: Text("Don't have an account ? Register"),
           ),
         ],
       )),
-    );
-  }
-}
-
-class SecondRoute extends StatefulWidget {
-  const SecondRoute({Key? key}) : super(key: key);
-
-  @override
-  State<SecondRoute> createState() => _SecondRouteState();
-}
-
-class _SecondRouteState extends State<SecondRoute> {
-  var taskNbr = 0;
-  List<String> entries = <String>[];
-  String test = 'base';
-  List<bool> ckeckedList = <bool>[];
-  bool isChecked = false;
-
-  void register(email, password) async {
-    try {
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(email: email, password: password);
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'weak-password') {
-        print('The password provided is too weak.');
-      } else if (e.code == 'email-already-in-use') {
-        print('The account already exists for that email.');
-      }
-    } catch (e) {
-      print(e);
-    } finally {
-      print("This is FINALLY Clause and is always executed.");
-      Navigator.pushNamed(context, '/third');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Align(
-              alignment: Alignment.topCenter,
-              child: Text(
-                'Register',
-                style: TextStyle(fontFamily: 'Praise', fontSize: 50),
-              ),
-            ),
-            Align(
-              alignment: Alignment.topCenter,
-              child: Text(
-                'Please enter your username and password ',
-                style: TextStyle(fontFamily: 'Praise', fontSize: 20),
-              ),
-            ),
-            TextField(
-              decoration: const InputDecoration(
-                  border: OutlineInputBorder(), hintText: 'Username'),
-              onChanged: (text) {
-                context.read<UserName>().SetUserName(text);
-              },
-            ),
-            TextField(
-              decoration: const InputDecoration(
-                  border: OutlineInputBorder(), hintText: 'Password'),
-              onChanged: (text) {
-                context.read<UserName>().SetPassword(text);
-              },
-            ),
-            ElevatedButton(
-                onPressed: () {
-                  final username = context.read<UserName>().username;
-                  final password = context.read<UserName>().password;
-                  register(username, password);
-                },
-                child: const Text('Register')),
-            TextButton(
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.all(16.0),
-                textStyle: const TextStyle(fontFamily: 'Praise', fontSize: 20),
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text("Already have an account ? Log In"),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class ThirdRoute extends StatefulWidget {
-  const ThirdRoute({Key? key}) : super(key: key);
-
-  @override
-  State<ThirdRoute> createState() => _ThirdRouteState();
-}
-
-class _ThirdRouteState extends State<ThirdRoute> {
-  CameraController? controller;
-  bool _isCameraInitialized = false;
-
-  @override
-  void initState() {
-    onNewCameraSelected(cameras[0]);
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    controller?.dispose();
-    super.dispose();
-  }
-
-  void onNewCameraSelected(CameraDescription cameraDescription) async {
-    final previousCameraController = controller;
-    // Instantiating the camera controller
-    final CameraController cameraController = CameraController(
-      cameraDescription,
-      ResolutionPreset.high,
-      imageFormatGroup: ImageFormatGroup.jpeg,
-    );
-
-    // Dispose the previous controller
-    await previousCameraController?.dispose();
-
-    // Replace with the new controller
-    if (mounted) {
-      setState(() {
-        controller = cameraController;
-      });
-    }
-
-    // Update UI if controller updated
-    cameraController.addListener(() {
-      if (mounted) setState(() {});
-    });
-
-    // Initialize controller
-    try {
-      await cameraController.initialize();
-    } on CameraException catch (e) {
-      print('Error initializing camera: $e');
-    }
-
-    // Update the Boolean
-    if (mounted) {
-      setState(() {
-        _isCameraInitialized = controller!.value.isInitialized;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: _isCameraInitialized
-          ? AspectRatio(
-              aspectRatio: 1 / controller!.value.aspectRatio,
-              child: controller!.buildPreview(),
-            )
-          : Container(),
     );
   }
 }
