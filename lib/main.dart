@@ -5,12 +5,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:camera/camera.dart';
 
+List<CameraDescription> cameras = [];
 FirebaseAuth auth = FirebaseAuth.instance;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp();
+
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    cameras = await availableCameras();
+  } on CameraException catch (e) {
+    print('Error in fetching the cameras: $e');
+  }
+
   runApp(
     MultiProvider(
       providers: [
@@ -255,38 +266,69 @@ class ThirdRoute extends StatefulWidget {
 }
 
 class _ThirdRouteState extends State<ThirdRoute> {
-  var taskNbr = 0;
-  List<String> entries = <String>[];
-  String test = 'base';
-  List<bool> ckeckedList = <bool>[];
-  bool isChecked = false;
+  CameraController? controller;
+  bool _isCameraInitialized = false;
 
-  void register(email, password) async {
+  @override
+  void initState() {
+    onNewCameraSelected(cameras[0]);
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
+  }
+
+  void onNewCameraSelected(CameraDescription cameraDescription) async {
+    final previousCameraController = controller;
+    // Instantiating the camera controller
+    final CameraController cameraController = CameraController(
+      cameraDescription,
+      ResolutionPreset.high,
+      imageFormatGroup: ImageFormatGroup.jpeg,
+    );
+
+    // Dispose the previous controller
+    await previousCameraController?.dispose();
+
+    // Replace with the new controller
+    if (mounted) {
+      setState(() {
+        controller = cameraController;
+      });
+    }
+
+    // Update UI if controller updated
+    cameraController.addListener(() {
+      if (mounted) setState(() {});
+    });
+
+    // Initialize controller
     try {
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(email: email, password: password);
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'weak-password') {
-        print('The password provided is too weak.');
-      } else if (e.code == 'email-already-in-use') {
-        print('The account already exists for that email.');
-      }
-    } catch (e) {
-      print(e);
-    } finally {
-      print("This is FINALLY Clause and is always executed.");
+      await cameraController.initialize();
+    } on CameraException catch (e) {
+      print('Error initializing camera: $e');
+    }
+
+    // Update the Boolean
+    if (mounted) {
+      setState(() {
+        _isCameraInitialized = controller!.value.isInitialized;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[],
-        ),
-      ),
+      body: _isCameraInitialized
+          ? AspectRatio(
+              aspectRatio: 1 / controller!.value.aspectRatio,
+              child: controller!.buildPreview(),
+            )
+          : Container(),
     );
   }
 }
