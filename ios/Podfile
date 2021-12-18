@@ -1,6 +1,6 @@
 target 'Runner' do
     pod 'AFNetworking', '~> 3.0'
     pod 'FBSDKCoreKit', '~> 4.9'
-    pod 'firebase_auth', '~> 3.3.3'
+    pod 'firebase', '~> 3.3.3'
     pod 'camera', '~> 0.9.4+5'
   end
