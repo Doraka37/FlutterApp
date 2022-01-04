@@ -2,5 +2,5 @@ platform :ios, '9.0'
 target 'Runner' do
     pod 'AFNetworking', '~> 3.0'
     pod 'FBSDKCoreKit', '~> 4.9'
-    pod 'camera', '~> 0.9.3'
+    pod 'camera'
   end
